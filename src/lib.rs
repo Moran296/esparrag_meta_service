@@ -122,7 +122,7 @@ pub struct RequestParameter {
 /// A command sent to the service as a json object of the form:
 /// /service/action POST {
 ///  "parameter_1": "value_1",
-/// "parameter_2": "value_2"
+///  "parameter_2": "value_2"
 /// }
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct ServiceRequest {
