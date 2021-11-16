@@ -8,7 +8,7 @@ const SERVICE_1: &str = r#"{
   "actions": [
     {
       "name": "action #1",
-      "description": "action #1 does something",
+      "description": "action #1 does somethingd",
       "parameters": [
         {
           "name": "a number #1",
@@ -181,7 +181,7 @@ mod tests {
             description: "a test service".to_string(),
             actions: vec![Action {
                 name: "action #1".to_string(),
-                description: "action #1 does something".to_string(),
+                description: "action #1 does somethingd".to_string(),
                 parameters: vec![
                     Parameter {
                         name: "a number #1".to_string(),
