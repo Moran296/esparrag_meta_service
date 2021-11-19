@@ -18,7 +18,7 @@ const SERVICE_1: &str = r#"{
           "default": null
         },
         {
-          "name": "a number #1",
+          "name": "a number #2",
           "description": "this number can be positive and negative and is not required",
           "type": "Int32",
           "required": false,
@@ -106,6 +106,28 @@ impl ServiceMeta {
     pub fn from_json(json: &str) -> Result<Self, serde_json::Error> {
         serde_json::from_str(json)
     }
+
+    pub fn caters(&self, requested: &ServiceRequest) -> bool {
+        if let Some(action) = self.actions.iter().find(|a| a.name == requested.action) {
+            for param in action.parameters.iter() {
+                if param.required
+                    && requested
+                        .parameters
+                        .iter()
+                        .find(|p| p.key == param.name && p.type_ == param.type_)
+                        .is_none()
+                {
+                    println!("missing required parameter: {}", param.name);
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        println!("action not found: {}", requested.action);
+        false
+    }
 }
 
 //---------------- COMMAND -------------------
@@ -137,6 +159,9 @@ impl ServiceRequest {
             action,
             parameters: Vec::new(),
         }
+    }
+    pub fn from_json(json: &str) -> Result<Self, serde_json::Error> {
+        serde_json::from_str(json)
     }
 
     /// add a parameter to the command
@@ -192,7 +217,7 @@ mod tests {
                         default: None,
                     },
                     Parameter {
-                        name: "a number #1".to_string(),
+                        name: "a number #2".to_string(),
                         description: "this number can be positive and negative and is not required"
                             .to_string(),
                         type_: ParameterType::Int32,
@@ -219,7 +244,7 @@ mod tests {
     fn serialize_json() {
         let service = mock_service();
         let json = serde_json::to_string_pretty(&service).unwrap();
-        println!("{}", json);
+        // println!("{}", json);
         assert_eq!(json, SERVICE_1.to_string());
     }
 
@@ -228,5 +253,94 @@ mod tests {
         let service = mock_service();
         let desirialized = serde_json::from_str(&SERVICE_1).unwrap();
         assert_eq!(service, desirialized);
+    }
+
+    #[test]
+    fn caters_1() {
+        let service = mock_service();
+        let request = ServiceRequest::from_json(
+            r#"
+        {
+          "action": "action #1",
+          "parameters": [
+                {
+                "key": "a number #1",
+                "value": "33",
+                "type": "Uint32"
+                }
+            ]
+        } "#,
+        )
+        .unwrap();
+
+        assert!(service.caters(&request));
+    }
+
+    #[test]
+    fn caters_2() {
+        let service = mock_service();
+        let request = ServiceRequest::from_json(
+            r#"
+        {
+          "action": "action #1",
+          "parameters": [
+                {
+                    "key": "a number #1",
+                    "value": "33",
+                    "type": "Uint32"
+                },
+                {
+                    "key": "a number #2",
+                    "value": "42",
+                    "type": "Int32"
+                }
+            ]
+        } "#,
+        )
+        .unwrap();
+
+        assert!(service.caters(&request));
+    }
+
+    #[test]
+    fn not_caters_1() {
+        let service = mock_service();
+        let request = ServiceRequest::from_json(
+            r#"
+        {
+          "action": "action #1",
+          "parameters": [
+                {
+                "key": "a number #1",
+                "value": "33",
+                "type": "String"
+                }
+            ]
+        } "#,
+        )
+        .unwrap();
+
+        assert!(!service.caters(&request));
+    }
+
+    #[test]
+    fn not_caters_2() {
+        let service = mock_service();
+        let request = ServiceRequest::from_json(
+            r#"
+        {
+          "action": "action #1",
+          "parameters": [
+                {
+                "key": "a number #2",
+                "value": "33",
+                "type": "Int32"
+                }
+            ]
+        } "#,
+        )
+        .unwrap();
+
+        assert!(!service.caters(&request));
     }
 }
