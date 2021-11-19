@@ -3,22 +3,22 @@ use serde::{Deserialize, Serialize};
 //used for testing
 #[allow(dead_code)]
 const SERVICE_1: &str = r#"{
-  "service": "service_1",
+  "service_name": "service_1",
   "description": "a test service",
   "actions": [
     {
-      "name": "action #1",
+      "action_name": "action #1",
       "description": "action #1 does something",
       "parameters": [
         {
-          "name": "a number #1",
+          "param_name": "a number #1",
           "description": "this number can be only positive and is required!",
           "type": "Uint32",
           "required": true,
           "default": null
         },
         {
-          "name": "a number #2",
+          "param_name": "a number #2",
           "description": "this number can be positive and negative and is not required",
           "type": "Int32",
           "required": false,
@@ -27,7 +27,7 @@ const SERVICE_1: &str = r#"{
       ],
       "outputs": [
         {
-          "name": "message",
+          "param_name": "message",
           "description": "a message of success or failure",
           "type": {
             "Enum": [
@@ -62,7 +62,7 @@ pub enum ParameterType {
 /// outputs of a possible action
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct Output {
-    pub name: String,
+    pub param_name: String,
     pub description: String,
     #[serde(rename = "type")]
     pub type_: ParameterType,
@@ -71,7 +71,7 @@ pub struct Output {
 /// Parameters of a possible action
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct Parameter {
-    pub name: String,
+    pub param_name: String,
     pub description: String,
     #[serde(rename = "type")]
     pub type_: ParameterType,
@@ -82,7 +82,7 @@ pub struct Parameter {
 /// A service is a collection of actions.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct Action {
-    pub name: String,
+    pub action_name: String,
     pub description: String,
     pub parameters: Vec<Parameter>,
     pub outputs: Vec<Output>,
@@ -92,7 +92,7 @@ pub struct Action {
 /// Contains name, description and actions
 #[derive(Default, Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct ServiceMeta {
-    pub service: String,
+    pub service_name: String,
     pub description: String,
     pub actions: Vec<Action>,
 }
@@ -108,16 +108,23 @@ impl ServiceMeta {
     }
 
     pub fn caters(&self, requested: &ServiceRequest) -> bool {
-        if let Some(action) = self.actions.iter().find(|a| a.name == requested.action) {
-            for param in action.parameters.iter() {
-                if param.required
+        if let Some(action) = self
+            .actions
+            .iter()
+            .find(|a| a.action_name == requested.action_name)
+        {
+            for service_param in action.parameters.iter() {
+                if service_param.required
                     && requested
                         .parameters
                         .iter()
-                        .find(|p| p.key == param.name && p.type_ == param.type_)
+                        .find(|req_param| {
+                            req_param.param_name == service_param.param_name
+                                && req_param.type_ == service_param.type_
+                        })
                         .is_none()
                 {
-                    println!("missing required parameter: {}", param.name);
+                    println!("missing required parameter: {}", service_param.param_name);
                     return false;
                 }
             }
@@ -125,7 +132,7 @@ impl ServiceMeta {
             return true;
         }
 
-        println!("action not found: {}", requested.action);
+        println!("action not found: {}", requested.action_name);
         false
     }
 }
@@ -135,7 +142,7 @@ impl ServiceMeta {
 ///command parameters to be sent as a command to a service. Inner member of the Command stuct
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct RequestParameter {
-    key: String,
+    param_name: String,
     value: String,
     #[serde(rename = "type")]
     type_: ParameterType,
@@ -148,15 +155,15 @@ pub struct RequestParameter {
 /// }
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct ServiceRequest {
-    pub action: String,
+    pub action_name: String,
     pub parameters: Vec<RequestParameter>,
 }
 
 impl ServiceRequest {
     /// create a new command
-    pub fn new(action: String) -> ServiceRequest {
+    pub fn new(action_name: String) -> ServiceRequest {
         ServiceRequest {
-            action,
+            action_name,
             parameters: Vec::new(),
         }
     }
@@ -165,8 +172,12 @@ impl ServiceRequest {
     }
 
     /// add a parameter to the command
-    pub fn add_parameter(&mut self, key: String, value: String, type_: ParameterType) {
-        self.parameters.push(RequestParameter { key, value, type_ });
+    pub fn add_parameter(&mut self, param_name: String, value: String, type_: ParameterType) {
+        self.parameters.push(RequestParameter {
+            param_name,
+            value,
+            type_,
+        });
     }
 }
 
@@ -189,8 +200,12 @@ impl ServiceResponse {
     }
 
     /// add a parameter to the response
-    pub fn add_parameter(&mut self, key: String, value: String, type_: ParameterType) {
-        self.parameters.push(RequestParameter { key, value, type_ });
+    pub fn add_parameter(&mut self, param_name: String, value: String, type_: ParameterType) {
+        self.parameters.push(RequestParameter {
+            param_name,
+            value,
+            type_,
+        });
     }
 }
 
@@ -202,14 +217,14 @@ mod tests {
 
     fn mock_service() -> ServiceMeta {
         ServiceMeta {
-            service: "service_1".to_string(),
+            service_name: "service_1".to_string(),
             description: "a test service".to_string(),
             actions: vec![Action {
-                name: "action #1".to_string(),
+                action_name: "action #1".to_string(),
                 description: "action #1 does something".to_string(),
                 parameters: vec![
                     Parameter {
-                        name: "a number #1".to_string(),
+                        param_name: "a number #1".to_string(),
                         description: "this number can be only positive and is required!"
                             .to_string(),
                         type_: ParameterType::Uint32,
@@ -217,7 +232,7 @@ mod tests {
                         default: None,
                     },
                     Parameter {
-                        name: "a number #2".to_string(),
+                        param_name: "a number #2".to_string(),
                         description: "this number can be positive and negative and is not required"
                             .to_string(),
                         type_: ParameterType::Int32,
@@ -226,7 +241,7 @@ mod tests {
                     },
                 ],
                 outputs: vec![Output {
-                    name: "message".to_string(),
+                    param_name: "message".to_string(),
                     description: "a message of success or failure".to_string(),
                     type_: ParameterType::Enum(vec!["ENUM_1".to_string(), "ENUM_2".to_string()]),
                 }],
@@ -261,10 +276,10 @@ mod tests {
         let request = ServiceRequest::from_json(
             r#"
         {
-          "action": "action #1",
+          "action_name": "action #1",
           "parameters": [
                 {
-                "key": "a number #1",
+                "param_name": "a number #1",
                 "value": "33",
                 "type": "Uint32"
                 }
@@ -282,15 +297,15 @@ mod tests {
         let request = ServiceRequest::from_json(
             r#"
         {
-          "action": "action #1",
+          "action_name": "action #1",
           "parameters": [
                 {
-                    "key": "a number #1",
+                    "param_name": "a number #1",
                     "value": "33",
                     "type": "Uint32"
                 },
                 {
-                    "key": "a number #2",
+                    "param_name": "a number #2",
                     "value": "42",
                     "type": "Int32"
                 }
@@ -308,10 +323,10 @@ mod tests {
         let request = ServiceRequest::from_json(
             r#"
         {
-          "action": "action #1",
+          "action_name": "action #1",
           "parameters": [
                 {
-                "key": "a number #1",
+                "param_name": "a number #1",
                 "value": "33",
                 "type": "String"
                 }
@@ -329,10 +344,10 @@ mod tests {
         let request = ServiceRequest::from_json(
             r#"
         {
-          "action": "action #1",
+          "action_name": "action #1",
           "parameters": [
                 {
-                "key": "a number #2",
+                "param_name": "a number #2",
                 "value": "33",
                 "type": "Int32"
                 }
