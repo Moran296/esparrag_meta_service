@@ -204,6 +204,10 @@ impl ServiceResponse {
         }
     }
 
+    pub fn from_json(json: &str) -> Result<Self, serde_json::Error> {
+        serde_json::from_str(json)
+    }
+
     /// add a parameter to the response
     pub fn add_parameter(&mut self, param_name: String, value: String, type_: ParameterType) {
         self.parameters.push(RequestParameter {
