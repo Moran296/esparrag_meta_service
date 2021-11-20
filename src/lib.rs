@@ -143,10 +143,10 @@ impl ServiceMeta {
 ///command parameters to be sent as a command to a service. Inner member of the Command stuct
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct RequestParameter {
-    param_name: String,
-    value: String,
+    pub param_name: String,
+    pub value: String,
     #[serde(rename = "type")]
-    type_: ParameterType,
+    pub type_: ParameterType,
 }
 
 /// A command sent to the service as a json object of the form:
