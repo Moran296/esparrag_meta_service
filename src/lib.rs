@@ -220,11 +220,11 @@ mod tests {
             service_name: "service_1".to_string(),
             description: "a test service".to_string(),
             actions: vec![Action {
-                action_name: "action #1".to_string(),
+                action_name: "action_1".to_string(),
                 description: "action #1 does something".to_string(),
                 parameters: vec![
                     Parameter {
-                        param_name: "a number #1".to_string(),
+                        param_name: "a_number_#1".to_string(),
                         description: "this number can be only positive and is required!"
                             .to_string(),
                         type_: ParameterType::Uint32,
@@ -232,7 +232,7 @@ mod tests {
                         default: None,
                     },
                     Parameter {
-                        param_name: "a number #2".to_string(),
+                        param_name: "a_number_#2".to_string(),
                         description: "this number can be positive and negative and is not required"
                             .to_string(),
                         type_: ParameterType::Int32,
