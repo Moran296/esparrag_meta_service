@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 //used for testing
 #[allow(dead_code)]
@@ -7,18 +8,18 @@ const SERVICE_1: &str = r#"{
   "description": "a test service",
   "actions": [
     {
-      "action_name": "action #1",
+      "action_name": "action_1",
       "description": "action #1 does something",
       "parameters": [
         {
-          "param_name": "a number #1",
+          "param_name": "a_number_#1",
           "description": "this number can be only positive and is required!",
           "type": "Uint32",
           "required": true,
           "default": null
         },
         {
-          "param_name": "a number #2",
+          "param_name": "a_number_#2",
           "description": "this number can be positive and negative and is not required",
           "type": "Int32",
           "required": false,
@@ -156,6 +157,7 @@ pub struct RequestParameter {
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct ServiceRequest {
     pub action_name: String,
+    pub uuid: Uuid,
     pub parameters: Vec<RequestParameter>,
 }
 
@@ -164,6 +166,7 @@ impl ServiceRequest {
     pub fn new(action_name: String) -> ServiceRequest {
         ServiceRequest {
             action_name,
+            uuid: Uuid::new_v4(),
             parameters: Vec::new(),
         }
     }
@@ -186,15 +189,17 @@ impl ServiceRequest {
 /// Response from a service as a json object
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct ServiceResponse {
-    message: String,
+    pub message: String,
+    pub uuid: Uuid,
     pub parameters: Vec<RequestParameter>,
 }
 
 impl ServiceResponse {
     /// create a new response
-    pub fn new(message: String) -> ServiceResponse {
+    pub fn new(message: String, uuid: Uuid) -> ServiceResponse {
         ServiceResponse {
             message,
+            uuid,
             parameters: Vec::new(),
         }
     }
@@ -276,10 +281,11 @@ mod tests {
         let request = ServiceRequest::from_json(
             r#"
         {
-          "action_name": "action #1",
+          "action_name": "action_1",
+          "uuid" : "67e55044-10b1-426f-9247-bb680e5fe0c8",
           "parameters": [
                 {
-                "param_name": "a number #1",
+                "param_name": "a_number_#1",
                 "value": "33",
                 "type": "Uint32"
                 }
@@ -297,15 +303,16 @@ mod tests {
         let request = ServiceRequest::from_json(
             r#"
         {
-          "action_name": "action #1",
+          "action_name": "action_1",
+          "uuid" : "67e55044-10b1-426f-9247-bb680e5fe0c8",
           "parameters": [
                 {
-                    "param_name": "a number #1",
+                    "param_name": "a_number_#1",
                     "value": "33",
                     "type": "Uint32"
                 },
                 {
-                    "param_name": "a number #2",
+                    "param_name": "a_number_#2",
                     "value": "42",
                     "type": "Int32"
                 }
@@ -323,10 +330,11 @@ mod tests {
         let request = ServiceRequest::from_json(
             r#"
         {
-          "action_name": "action #1",
+          "action_name": "action_1",
+          "uuid" : "67e55044-10b1-426f-9247-bb680e5fe0c8",
           "parameters": [
                 {
-                "param_name": "a number #1",
+                "param_name": "a_number_#1",
                 "value": "33",
                 "type": "String"
                 }
@@ -344,10 +352,11 @@ mod tests {
         let request = ServiceRequest::from_json(
             r#"
         {
-          "action_name": "action #1",
+          "action_name": "action_1",
+          "uuid" : "67e55044-10b1-426f-9247-bb680e5fe0c8",
           "parameters": [
                 {
-                "param_name": "a number #2",
+                "param_name": "a_number_#2",
                 "value": "33",
                 "type": "Int32"
                 }
