@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
+use serde_json::{json, Value};
 
 //used for testing
 #[allow(dead_code)]
@@ -9,17 +9,16 @@ const SERVICE_1: &str = r#"{
   "actions": [
     {
       "action_name": "action_1",
-      "description": "action #1 does something",
+      "description": "action 1 does something",
       "parameters": [
         {
-          "param_name": "a_number_#1",
+          "param_name": "a_number_1",
           "description": "this number can be only positive and is required!",
           "type": "Uint32",
-          "required": true,
-          "default": null
+          "required": true
         },
         {
-          "param_name": "a_number_#2",
+          "param_name": "a_number_2",
           "description": "this number can be positive and negative and is not required",
           "type": "Int32",
           "required": false,
@@ -53,9 +52,7 @@ pub enum ParameterType {
     Int8,
     Int16,
     Int32,
-    Int64,
     Float,
-    Double,
     String,
     Enum(Vec<String>),
 }
@@ -77,6 +74,7 @@ pub struct Parameter {
     #[serde(rename = "type")]
     pub type_: ParameterType,
     pub required: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub default: Option<String>,
 }
 
@@ -108,113 +106,89 @@ impl ServiceMeta {
         serde_json::from_str(json)
     }
 
-    pub fn caters(&self, requested: &ServiceRequest) -> bool {
-        if let Some(action) = self
-            .actions
-            .iter()
-            .find(|a| a.action_name == requested.action_name)
-        {
-            for service_param in action.parameters.iter() {
-                if service_param.required
-                    && requested
-                        .parameters
-                        .iter()
-                        .find(|req_param| {
-                            req_param.param_name == service_param.param_name
-                                && req_param.type_ == service_param.type_
-                        })
-                        .is_none()
-                {
-                    println!("missing required parameter: {}", service_param.param_name);
-                    return false;
-                }
-            }
+    pub fn caters(&self, request: &Value) -> bool {
+        let action = self.get_action(&request);
+        if action.is_none() {
+            return false;
+        }
 
+        for parameter in action.unwrap().parameters.iter() {
+            if !self.caters_parameter(parameter, request) {
+                return false;
+            }
+        }
+
+        true
+    }
+
+    fn get_action(&self, request: &Value) -> Option<&Action> {
+        if let Value::String(requested_action) = &request["action_name"] {
+            if let Some(action) = self
+                .actions
+                .iter()
+                .find(|action| *requested_action == action.action_name)
+            {
+                return Some(action);
+            }
+        }
+
+        None
+    }
+
+    fn caters_parameter(&self, parameter: &Parameter, request: &Value) -> bool {
+        if !parameter.required {
             return true;
         }
 
-        println!("action not found: {}", requested.action_name);
+        if let Some(requested_parameter) = request.get(&parameter.param_name) {
+            match &parameter.type_ {
+                ParameterType::Uint8 => {
+                    if let Some(value) = requested_parameter.as_u64() {
+                        return value <= u8::max_value() as u64;
+                    }
+                }
+                ParameterType::Uint16 => {
+                    if let Some(value) = requested_parameter.as_u64() {
+                        return value <= u16::max_value() as u64;
+                    }
+                }
+                ParameterType::Uint32 => {
+                    if let Some(value) = requested_parameter.as_u64() {
+                        return value <= u32::max_value() as u64;
+                    }
+                }
+                ParameterType::Uint64 => {
+                    if let Some(value) = requested_parameter.as_u64() {
+                        return value <= u32::max_value() as u64;
+                    }
+                }
+                ParameterType::Int8 => {
+                    if let Some(value) = requested_parameter.as_i64() {
+                        return value <= i8::max_value() as i64;
+                    }
+                }
+                ParameterType::Int16 => {
+                    if let Some(value) = requested_parameter.as_i64() {
+                        return value <= i16::max_value() as i64;
+                    }
+                }
+                ParameterType::Int32 => {
+                    if let Some(value) = requested_parameter.as_i64() {
+                        return value <= i32::max_value() as i64;
+                    }
+                }
+                ParameterType::Bool => return requested_parameter.is_boolean(),
+                ParameterType::Float => return requested_parameter.is_f64(),
+                ParameterType::String => return requested_parameter.is_string(),
+                ParameterType::Enum(possibles) => {
+                    if let Some(value) = requested_parameter.as_str() {
+                        return possibles.contains(&value.to_string());
+                    }
+                }
+            }
+        }
+
         false
-    }
-}
-
-//---------------- COMMAND -------------------
-
-///command parameters to be sent as a command to a service. Inner member of the Command stuct
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
-pub struct RequestParameter {
-    pub param_name: String,
-    pub value: String,
-    #[serde(rename = "type")]
-    pub type_: ParameterType,
-}
-
-/// A command sent to the service as a json object of the form:
-/// /service/action POST {
-///  "parameter_1": "value_1",
-///  "parameter_2": "value_2"
-/// }
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
-pub struct ServiceRequest {
-    pub action_name: String,
-    pub uuid: Uuid,
-    pub parameters: Vec<RequestParameter>,
-}
-
-impl ServiceRequest {
-    /// create a new command
-    pub fn new(action_name: String) -> ServiceRequest {
-        ServiceRequest {
-            action_name,
-            uuid: Uuid::new_v4(),
-            parameters: Vec::new(),
-        }
-    }
-    pub fn from_json(json: &str) -> Result<Self, serde_json::Error> {
-        serde_json::from_str(json)
-    }
-
-    /// add a parameter to the command
-    pub fn add_parameter(&mut self, param_name: String, value: String, type_: ParameterType) {
-        self.parameters.push(RequestParameter {
-            param_name,
-            value,
-            type_,
-        });
-    }
-}
-
-//---------------- RESPONSE -------------------
-
-/// Response from a service as a json object
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
-pub struct ServiceResponse {
-    pub message: String,
-    pub uuid: Uuid,
-    pub parameters: Vec<RequestParameter>,
-}
-
-impl ServiceResponse {
-    /// create a new response
-    pub fn new(message: String, uuid: Uuid) -> ServiceResponse {
-        ServiceResponse {
-            message,
-            uuid,
-            parameters: Vec::new(),
-        }
-    }
-
-    pub fn from_json(json: &str) -> Result<Self, serde_json::Error> {
-        serde_json::from_str(json)
-    }
-
-    /// add a parameter to the response
-    pub fn add_parameter(&mut self, param_name: String, value: String, type_: ParameterType) {
-        self.parameters.push(RequestParameter {
-            param_name,
-            value,
-            type_,
-        });
     }
 }
 
@@ -230,10 +204,10 @@ mod tests {
             description: "a test service".to_string(),
             actions: vec![Action {
                 action_name: "action_1".to_string(),
-                description: "action #1 does something".to_string(),
+                description: "action 1 does something".to_string(),
                 parameters: vec![
                     Parameter {
-                        param_name: "a_number_#1".to_string(),
+                        param_name: "a_number_1".to_string(),
                         description: "this number can be only positive and is required!"
                             .to_string(),
                         type_: ParameterType::Uint32,
@@ -241,7 +215,7 @@ mod tests {
                         default: None,
                     },
                     Parameter {
-                        param_name: "a_number_#2".to_string(),
+                        param_name: "a_number_2".to_string(),
                         description: "this number can be positive and negative and is not required"
                             .to_string(),
                         type_: ParameterType::Int32,
@@ -268,7 +242,7 @@ mod tests {
     fn serialize_json() {
         let service = mock_service();
         let json = serde_json::to_string_pretty(&service).unwrap();
-        // println!("{}", json);
+        println!("{}", json);
         assert_eq!(json, SERVICE_1.to_string());
     }
 
@@ -282,18 +256,12 @@ mod tests {
     #[test]
     fn caters_1() {
         let service = mock_service();
-        let request = ServiceRequest::from_json(
+        let request = serde_json::from_str(
             r#"
         {
-          "action_name": "action_1",
-          "uuid" : "67e55044-10b1-426f-9247-bb680e5fe0c8",
-          "parameters": [
-                {
-                "param_name": "a_number_#1",
-                "value": "33",
-                "type": "Uint32"
-                }
-            ]
+           "action_name": "action_1",
+           "a_number_1": 33,
+           "a_number_2": 42
         } "#,
         )
         .unwrap();
@@ -304,23 +272,11 @@ mod tests {
     #[test]
     fn caters_2() {
         let service = mock_service();
-        let request = ServiceRequest::from_json(
+        let request = serde_json::from_str(
             r#"
         {
-          "action_name": "action_1",
-          "uuid" : "67e55044-10b1-426f-9247-bb680e5fe0c8",
-          "parameters": [
-                {
-                    "param_name": "a_number_#1",
-                    "value": "33",
-                    "type": "Uint32"
-                },
-                {
-                    "param_name": "a_number_#2",
-                    "value": "42",
-                    "type": "Int32"
-                }
-            ]
+           "action_name": "action_1",
+           "a_number_1": 33
         } "#,
         )
         .unwrap();
@@ -331,18 +287,11 @@ mod tests {
     #[test]
     fn not_caters_1() {
         let service = mock_service();
-        let request = ServiceRequest::from_json(
+        let request = serde_json::from_str(
             r#"
         {
-          "action_name": "action_1",
-          "uuid" : "67e55044-10b1-426f-9247-bb680e5fe0c8",
-          "parameters": [
-                {
-                "param_name": "a_number_#1",
-                "value": "33",
-                "type": "String"
-                }
-            ]
+           "action_name": "action_1",
+           "a_number_1": "33"
         } "#,
         )
         .unwrap();
@@ -353,18 +302,81 @@ mod tests {
     #[test]
     fn not_caters_2() {
         let service = mock_service();
-        let request = ServiceRequest::from_json(
+        let request = serde_json::from_str(
             r#"
         {
-          "action_name": "action_1",
-          "uuid" : "67e55044-10b1-426f-9247-bb680e5fe0c8",
-          "parameters": [
-                {
-                "param_name": "a_number_#2",
-                "value": "33",
-                "type": "Int32"
-                }
-            ]
+           "action_name": "action_4",
+           "a_number_1": 33
+        } "#,
+        )
+        .unwrap();
+
+        assert!(!service.caters(&request));
+    }
+
+    #[test]
+    fn caters_enum() {
+        let service = ServiceMeta {
+            service_name: "service_1".to_string(),
+            description: "a test service".to_string(),
+            actions: vec![Action {
+                action_name: "action_1".to_string(),
+                description: "action 1 does something".to_string(),
+                parameters: vec![Parameter {
+                    param_name: "color".to_string(),
+                    description: "this number can be only positive and is required!".to_string(),
+                    type_: ParameterType::Enum(vec!["RED".to_string(), "BLUE".to_string()]),
+                    required: true,
+                    default: None,
+                }],
+                outputs: vec![Output {
+                    param_name: "message".to_string(),
+                    description: "a message of success or failure".to_string(),
+                    type_: ParameterType::Enum(vec!["ENUM_1".to_string(), "ENUM_2".to_string()]),
+                }],
+            }],
+        };
+
+        let request = serde_json::from_str(
+            r#"
+        {
+           "action_name": "action_1",
+           "color": "RED"
+        } "#,
+        )
+        .unwrap();
+
+        assert!(service.caters(&request));
+    }
+
+    #[test]
+    fn not_caters_enum() {
+        let service = ServiceMeta {
+            service_name: "service_1".to_string(),
+            description: "a test service".to_string(),
+            actions: vec![Action {
+                action_name: "action_1".to_string(),
+                description: "action 1 does something".to_string(),
+                parameters: vec![Parameter {
+                    param_name: "color".to_string(),
+                    description: "this number can be only positive and is required!".to_string(),
+                    type_: ParameterType::Enum(vec!["RED".to_string(), "BLUE".to_string()]),
+                    required: true,
+                    default: None,
+                }],
+                outputs: vec![Output {
+                    param_name: "message".to_string(),
+                    description: "a message of success or failure".to_string(),
+                    type_: ParameterType::Enum(vec!["ENUM_1".to_string(), "ENUM_2".to_string()]),
+                }],
+            }],
+        };
+
+        let request = serde_json::from_str(
+            r#"
+        {
+           "action_name": "action_1",
+           "color": "ORANGE"
         } "#,
         )
         .unwrap();
