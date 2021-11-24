@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::Value;
 
 //used for testing
 #[allow(dead_code)]
@@ -106,19 +106,16 @@ impl ServiceMeta {
         serde_json::from_str(json)
     }
 
-    pub fn caters(&self, request: &Value) -> bool {
-        let action = self.get_action(&request);
-        if action.is_none() {
-            return false;
-        }
+    pub fn caters(&self, request: &Value) -> Result<(), &str> {
+        let action = self.get_action(&request).ok_or("action not found")?;
 
-        for parameter in action.unwrap().parameters.iter() {
+        for parameter in action.parameters.iter() {
             if !self.caters_parameter(parameter, request) {
-                return false;
+                return Err("Parameter not found");
             }
         }
 
-        true
+        Ok(())
     }
 
     fn get_action(&self, request: &Value) -> Option<&Action> {
@@ -266,7 +263,7 @@ mod tests {
         )
         .unwrap();
 
-        assert!(service.caters(&request));
+        assert!(service.caters(&request).is_ok());
     }
 
     #[test]
@@ -281,7 +278,7 @@ mod tests {
         )
         .unwrap();
 
-        assert!(service.caters(&request));
+        assert!(service.caters(&request).is_ok());
     }
 
     #[test]
@@ -296,7 +293,7 @@ mod tests {
         )
         .unwrap();
 
-        assert!(!service.caters(&request));
+        assert!(service.caters(&request).is_err());
     }
 
     #[test]
@@ -311,7 +308,7 @@ mod tests {
         )
         .unwrap();
 
-        assert!(!service.caters(&request));
+        assert!(service.caters(&request).is_err());
     }
 
     #[test]
@@ -346,7 +343,7 @@ mod tests {
         )
         .unwrap();
 
-        assert!(service.caters(&request));
+        assert!(service.caters(&request).is_ok());
     }
 
     #[test]
@@ -381,6 +378,6 @@ mod tests {
         )
         .unwrap();
 
-        assert!(!service.caters(&request));
+        assert!(service.caters(&request).is_err());
     }
 }
