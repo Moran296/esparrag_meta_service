@@ -107,10 +107,10 @@ impl ServiceMeta {
         serde_json::from_str(json)
     }
 
-    pub fn caters(&self, request: &Value) -> Result<(), io::Error> {
-        let action = self.get_action(&request).ok_or(io::Error::new(
+    pub fn caters(&self, action: &str, request: &Value) -> Result<(), io::Error> {
+        let action = self.get_action(action).ok_or(io::Error::new(
             io::ErrorKind::Other,
-            "No catered action found",
+            format!("No catered action found for {}", action),
         ))?;
 
         for parameter in action.parameters.iter() {
@@ -128,15 +128,13 @@ impl ServiceMeta {
         Ok(())
     }
 
-    fn get_action(&self, request: &Value) -> Option<&Action> {
-        if let Value::String(requested_action) = &request["action_name"] {
-            if let Some(action) = self
-                .actions
-                .iter()
-                .find(|action| *requested_action == action.action_name)
-            {
-                return Some(action);
-            }
+    fn get_action(&self, requested_action: &str) -> Option<&Action> {
+        if let Some(action) = self
+            .actions
+            .iter()
+            .find(|action| *requested_action == action.action_name)
+        {
+            return Some(action);
         }
 
         None
@@ -266,14 +264,13 @@ mod tests {
         let request = serde_json::from_str(
             r#"
         {
-           "action_name": "action_1",
            "a_number_1": 33,
            "a_number_2": 42
         } "#,
         )
         .unwrap();
 
-        assert!(service.caters(&request).is_ok());
+        assert!(service.caters("action_1", &request).is_ok());
     }
 
     #[test]
@@ -282,13 +279,12 @@ mod tests {
         let request = serde_json::from_str(
             r#"
         {
-           "action_name": "action_1",
            "a_number_1": 33
         } "#,
         )
         .unwrap();
 
-        assert!(service.caters(&request).is_ok());
+        assert!(service.caters("action_1", &request).is_ok());
     }
 
     #[test]
@@ -297,13 +293,12 @@ mod tests {
         let request = serde_json::from_str(
             r#"
         {
-           "action_name": "action_1",
            "a_number_1": "33"
         } "#,
         )
         .unwrap();
 
-        assert!(service.caters(&request).is_err());
+        assert!(service.caters("action_1", &request).is_err());
     }
 
     #[test]
@@ -312,13 +307,12 @@ mod tests {
         let request = serde_json::from_str(
             r#"
         {
-           "action_name": "action_4",
            "a_number_1": 33
         } "#,
         )
         .unwrap();
 
-        assert!(service.caters(&request).is_err());
+        assert!(service.caters("action_4", &request).is_err());
     }
 
     #[test]
@@ -347,13 +341,12 @@ mod tests {
         let request = serde_json::from_str(
             r#"
         {
-           "action_name": "action_1",
            "color": "RED"
         } "#,
         )
         .unwrap();
 
-        assert!(service.caters(&request).is_ok());
+        assert!(service.caters("action_1", &request).is_ok());
     }
 
     #[test]
@@ -382,12 +375,11 @@ mod tests {
         let request = serde_json::from_str(
             r#"
         {
-           "action_name": "action_1",
            "color": "ORANGE"
         } "#,
         )
         .unwrap();
 
-        assert!(service.caters(&request).is_err());
+        assert!(service.caters("action_1", &request).is_err());
     }
 }
