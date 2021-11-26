@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::io;
 
 //used for testing
 #[allow(dead_code)]
@@ -106,12 +107,21 @@ impl ServiceMeta {
         serde_json::from_str(json)
     }
 
-    pub fn caters(&self, request: &Value) -> Result<(), &str> {
-        let action = self.get_action(&request).ok_or("action not found")?;
+    pub fn caters(&self, request: &Value) -> Result<(), io::Error> {
+        let action = self.get_action(&request).ok_or(io::Error::new(
+            io::ErrorKind::Other,
+            "No catered action found",
+        ))?;
 
         for parameter in action.parameters.iter() {
             if !self.caters_parameter(parameter, request) {
-                return Err("Parameter not found");
+                return Err(io::Error::new(
+                    io::ErrorKind::Other,
+                    format!(
+                        "parameter {} not catered. parameter: {:#?}",
+                        parameter.param_name, parameter
+                    ),
+                ));
             }
         }
 
